@@ -33,6 +33,7 @@ public class SpaceController {
 
     @GetMapping("/lines/{n}")
     public List<LineDto> lines(@PathVariable int n) {
+        if (n < 2) throw new IllegalArgumentException("n must be >= 2");
         return service.linesAtLeast(n);
     }
 

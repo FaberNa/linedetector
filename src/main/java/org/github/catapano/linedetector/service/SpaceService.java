@@ -16,27 +16,41 @@ import java.util.concurrent.atomic.AtomicLong;
 public class SpaceService {
     private final AtomicLong seq = new AtomicLong(1);
     private final Map<Long, Point> points = new ConcurrentHashMap<>();
+    private final Object mutex = new Object();
 
     public Point add(long x, long y) {
-        long id = seq.getAndIncrement();
-        Point p = new Point(id, x, y);
-        points.put(id, p);
-        return p;
+        // need for syncrhonization to ensure consistent state of points map
+        synchronized (mutex) {
+            long id = seq.getAndIncrement();
+            Point p = new Point(id, x, y);
+            points.put(id, p);
+            return p;
+        }
     }
 
     public List<Point> allPoints() {
-        return points.values().stream()
+        return snapshotPoints().stream()
                 .sorted(Comparator.comparingLong(Point::id))
                 .toList();
     }
 
     public void clear() {
-        points.clear();
+        synchronized (mutex) {
+            points.clear();
+        }
+    }
+
+    private List<Point> snapshotPoints() {
+        synchronized (mutex) {
+            return new ArrayList<>(points.values());
+        }
     }
 
     public List<LineDto> linesAtLeast(int n) {
         if (n <= 1) throw new IllegalArgumentException("n must be >= 2");
-        List<Point> pts = allPoints();
+        List<Point> pts = snapshotPoints().stream()
+                .sorted(Comparator.comparingLong(Point::id))
+                .toList();
         int numberOfPoints = pts.size();
         // if there are fewer points than n, we can return early with empty list
         if (numberOfPoints < n) return List.of();
